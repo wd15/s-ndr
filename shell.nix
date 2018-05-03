@@ -18,8 +18,11 @@ in
       nixpkgs.python36Packages.numpy
       nixpkgs.python36Packages.scipy
       nixpkgs.python36Packages.jupyter
+      nixpkgs.python36Packages.toolz
+      nixpkgs.python36Packages.pytest
       fipy
       gmsh
       skfmm
+
     ];
   }
