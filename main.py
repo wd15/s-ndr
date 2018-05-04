@@ -31,7 +31,7 @@ def get_params():
         sup_ini=0.0,
         nx=100,
         dt=1e-3,
-        vel=0.0
+        vel=10.0e+6
     )
 
 
