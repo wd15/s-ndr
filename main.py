@@ -1,6 +1,6 @@
 import numpy as np
 import fipy
-from toolz.curried import memoize, do, curry, valmap, first
+from toolz.curried import memoize, do, curry, valmap, first, pipe
 from toolz_ import update, iterate_, rcompose, save
 from toolz_ import debug
 
@@ -26,7 +26,7 @@ def get_params():
         vm=0.01,
         tf=65.0,
         max_sweeps=4,
-        max_steps=1,
+        max_steps=400,
         theta_ini=0.0,
         sup_ini=0.0,
         nx=100,
@@ -42,7 +42,7 @@ def get_inf(var):
 @curry
 def theta_eqn(params, sup, theta, **kwargs):
     def expression1():
-        return (theta['old'] + params['dt'] * params['k_plus'] * get_inf(sup))
+        return theta['old'] + params['dt'] * params['k_plus'] * get_inf(sup)
 
     def expression2():
         return params['k_plus'] * get_inf(sup) + \
@@ -69,10 +69,10 @@ get_mask = rcompose(
 
 @save
 def get_eqn(params, mesh):
-    print('building equation')
     flux = fipy.CellVariable(mesh, value=0.)
     eqn = fipy.TransientTerm() == fipy.DiffusionTerm(params['diff_sup']) + \
         fipy.ImplicitSourceTerm(flux * get_mask(mesh) / mesh.dx)
+
     def func(theta):
         flux.setValue(-params['gamma'] * params['k_plus'] * (1 - theta['new']))
         return eqn
@@ -87,12 +87,43 @@ def sup_eqn(params, sup, theta, **kwargs):
 
 @curry
 def output_sweep(params, values):
-    print('output sweep')
+    keys = ('sweeps', 'sup', 'theta')
+    space = " " * 3
+    lj = 20
+    if values['sweeps'][0] == 1:
+        print(space.join(
+            map(
+                lambda x: x.ljust(lj),
+                keys
+            )
+        ))
+        print(space.join(["-" * (lj)] * len(keys)))
+
+    def sci(v):
+        return "{:.3E}".format(v)
+
+    def get_res(key):
+        if key == 'sweeps':
+            return str(values[key][0]).ljust(lj // 2)
+        else:
+            return sci(values[key][1]).ljust(lj // 2 + 1)
+
+    def get_val(key):
+        if key == 'sweeps':
+            return " ".rjust(lj // 2)
+        elif key == 'sup':
+            return sci(float(values[key][0][0]))
+        elif key == 'theta':
+            return sci(float(values[key][0]['new']))
+
+    print(space.join(map(lambda k: get_res(k) + get_val(k), keys)))
 
 
 @curry
 def output_step(params, values):
-    print('output step')
+    print()
+    print('step:', values['steps'])
+    print()
 
 
 def sweep_func(params):
@@ -105,27 +136,25 @@ def sweep_func(params):
                 sweeps=lambda **x: (x['sweeps'] + 1, None)
             )
         ),
-        do(output_sweep),
+        do(output_sweep(params)),
         valmap(first)
     )
-
-
 
 
 @curry
 def step_func(params):
     return rcompose(
+        do(output_step(params)),
         update(
             dict(
                 sup=lambda **x: do(lambda x: x.updateOld())(x['sup']),
-                theta=lambda **x: dict(new=x['theta']['old'],
-                                       old=x['theta']['old']),
+                theta=lambda **x: dict(new=x['theta']['new'],
+                                       old=x['theta']['new']),
                 steps=lambda **x: x['steps'] + 1,
                 sweeps=lambda **x: 0
             )
         ),
-        iterate_(sweep_func(params), params['max_sweeps']),
-        do(output_step(params)),
+        iterate_(sweep_func(params), params['max_sweeps'])
     )
 
 
@@ -138,14 +167,21 @@ def get_mesh(params):
     return fipy.Grid1D(nx=params['nx'], dx=params['delta'] / params['nx'])
 
 
+def get_sup_var(params):
+    return pipe(
+        params,
+        get_mesh,
+        lambda x: fipy.CellVariable(x, value=params['sup_ini'], hasOld=True),
+        do(lambda x: x.constrain(params['sup_inf'], where=x.mesh.facesRight))
+    )
+
+
 def run(params):
     iterate_(
         step_func(params),
         params['max_steps'],
         dict(theta=dict(new=params['theta_ini'], old=params['theta_ini']),
-             sup=fipy.CellVariable(get_mesh(params),
-                                   value=params['sup_ini'],
-                                   hasOld=True),
+             sup=get_sup_var(params),
              sweeps=0,
              steps=0)
     )
