@@ -20,6 +20,7 @@ in
       nixpkgs.python36Packages.jupyter
       nixpkgs.python36Packages.toolz
       nixpkgs.python36Packages.pytest
+      nixpkgs.python36Packages.ipdb
       fipy
       gmsh
       skfmm
