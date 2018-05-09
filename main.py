@@ -31,21 +31,21 @@ def get_params():
         sup_ini=0.0,
         nx=100,
         dt=1e-3,
-        vel=10.0e+6
+        vel=10.0e+6,
+        output=True
     )
 
 
-def get_inf(var):
-    return np.array(var[-1])
-
+def get_b(var):
+    return float(var[0])
 
 @curry
 def theta_eqn(params, sup, theta, **kwargs):
     def expression1():
-        return theta['old'] + params['dt'] * params['k_plus'] * get_inf(sup)
+        return theta['old'] + params['dt'] * params['k_plus'] * get_b(sup)
 
     def expression2():
-        return params['k_plus'] * get_inf(sup) + \
+        return params['k_plus'] * get_b(sup) + \
             params['k_minus'] * params['vel']
 
     @memoize
@@ -57,13 +57,9 @@ def theta_eqn(params, sup, theta, **kwargs):
             abs(new_value() - theta['new']))
 
 
-def calc_mask(mesh):
-    return mesh.x > (max(mesh.x) - mesh.dx / 2)
-
-
 get_mask = rcompose(
     lambda x: fipy.CellVariable(mesh=x),
-    do(lambda x: x.setValue(1, where=calc_mask(x.mesh)))
+    do(lambda x: x.setValue(1, where=x.mesh.x < x.mesh.dx))
 )
 
 
@@ -136,7 +132,7 @@ def sweep_func(params):
                 sweeps=lambda **x: (x['sweeps'] + 1, None)
             )
         ),
-        do(output_sweep(params)),
+        do(lambda x: output_sweep(params) if params['output'] else None),
         valmap(first)
     )
 
@@ -144,7 +140,7 @@ def sweep_func(params):
 @curry
 def step_func(params):
     return rcompose(
-        do(output_step(params)),
+        do(lambda x: output_step(params) if params['output'] else None),
         update(
             dict(
                 sup=lambda **x: do(lambda x: x.updateOld())(x['sup']),
@@ -177,7 +173,7 @@ def get_sup_var(params):
 
 
 def run(params):
-    iterate_(
+    return iterate_(
         step_func(params),
         params['max_steps'],
         dict(theta=dict(new=params['theta_ini'], old=params['theta_ini']),
@@ -188,4 +184,17 @@ def run(params):
 
 
 if __name__ == '__main__':
-    run(get_params())
+    out = run(dict(get_params(),
+             diff_sup=1.0,
+             sup_inf=1.0,
+             delta=1.0,
+             k_plus=1.0,
+             k_minus=1.0,
+             vel=0.5,
+             gamma=1.0,
+             dt=1e+10,
+             nx=1000,
+             max_steps=1,
+             max_sweeps=15))
+
+    print(out)
