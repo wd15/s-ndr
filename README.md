@@ -4,12 +4,28 @@ This repository solves the 1D S-NDR equations for electrochemistry. The equation
 
 # Installation and Usage
 
-Either use Nix or the Dockerfile to build the environment ...
+Either use Nix or Docker
+
+## Nix
+
+Follow these [Nix
+notes](https://github.com/wd15/nixes/blob/master/NIX-NOTES.md) for
+installing Nix.
+
+After installing Nix and cloning this repository, run
+
+    $ nix-shell
+
+to get an environment to run the notebook examples
+
+## Docker
+
+# Testing
+
+Run all the tests with
+
+    $ nix-shell --command "py.test"
 
 # License
 
 The license is the [MIT license](./LICENSE).
-
-
-
-
