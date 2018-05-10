@@ -1,7 +1,4 @@
 ---
 language: nix
-cache:
-  directories:
-    - /nix
 script:
   - nix-shell --command "py.test"
