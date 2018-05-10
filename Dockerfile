@@ -56,4 +56,4 @@ RUN /bin/bash -c " \
     nix-shell;"
 
 RUN echo "source ~/nix.sh" >> ~/.bashrc
-EXPOSE 8000
+EXPOSE 8888

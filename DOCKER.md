@@ -18,12 +18,15 @@ Pull the Docker Instance from Dockerhub
 
 Run the container
 
-    $ docker run -i -t -p 4000:4000 wd15/s-ndr:latest
+    $ docker run -i -t -p 8888:8888 wd15/s-ndr:latest
 
 and then
 
     # nix-shell
-    # jupyter notebook
+    # jupyter notebook --port 8888 --ip 0.0.0.0
+
+and view the notebook at http://127.0.0.1:8888/?token=<token> when the
+token is displayed.
 
 ## Build the Docker instance
 
