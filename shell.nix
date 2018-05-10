@@ -4,7 +4,7 @@ let
     owner = "wd15";
     repo = "nixes";
     rev = "5e58e59a945cd3ce3c39d88cc4618d4f426cd030";
-    sha256 = "0gk9pd4a5n57dp9cm0x414j03ja5gim82pzzd7z6ww7wbqb03v9f";
+    sha256 = "1s5hmgyxjfs5sgb13sx0rmnkgccmnkn6x64hhxrzjj1m71l5nkyw";
   };
   pkgs = nixpkgs.pkgs;
   nixpkgs = import "${download}/fipy-py3/nixpkgs_version.nix";
