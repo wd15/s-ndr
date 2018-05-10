@@ -2,3 +2,4 @@
 language: nix
 script:
   - nix-shell --command "py.test"
+  - nix-shell -p "python36Packages.black" "black --check *.py"

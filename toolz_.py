@@ -25,8 +25,11 @@ def iterate_(func, times, value):
 
 
 def debug(x):
-    import ipdb; ipdb.set_trace()
+    import ipdb
+
+    ipdb.set_trace()
     return x
+
 
 @curry
 def update(funcs, values):
@@ -57,6 +60,7 @@ class Save:
     6
 
     """
+
     def __init__(self, f):
         self.f = f
         self.out = None
