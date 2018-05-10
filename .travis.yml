@@ -1,4 +1,4 @@
 ---
 language: nix
 script:
-  - nix-shell --commaand "py.test"
+  - nix-shell --command "py.test"
