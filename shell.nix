@@ -9,7 +9,6 @@ let
   pkgs = nixpkgs.pkgs;
   nixpkgs = import "${download}/fipy-py3/nixpkgs_version.nix";
   fipy = import "${download}/fipy-py3/fipy.nix" { inherit nixpkgs; };
-  # gmsh = import "${download}/fipy-py3/gmsh.nix" { inherit nixpkgs; };
   skfmm = import "${download}/fipy-py3/skfmm.nix" { inherit nixpkgs; };
   nbval = import "${download}/fipy-py3/nbval.nix" { inherit nixpkgs; };
 in
@@ -26,8 +25,8 @@ in
       nixpkgs.python36Packages.ipdb
       nixpkgs.python36Packages.pip
       nixpkgs.python36Packages.matplotlib
+      nixpkgs.python36Packages.flake8
       fipy
-      # gmsh
       skfmm
       nbval
     ];
