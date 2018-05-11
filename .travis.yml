@@ -2,4 +2,6 @@
 language: nix
 script:
   - nix-shell --command "py.test"
-  - nix-shell -p "python36Packages.black" "black --check *.py"
+  - nix-shell -p "python36Packages.black" --command "black --check *.py"
+  - nix-shell -p "python36Packages.black" --command "pylint *.py"
+  - nix-shell -p "python36Packages.black" --command "flake8 *.py"

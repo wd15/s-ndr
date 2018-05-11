@@ -24,11 +24,19 @@ def iterate_(func, times, value):
     return next(iter_)
 
 
-def debug(x):
+def debug(arg):
+    """Debug for function composition
+
+    Params:
+      arg: the input argument
+
+    Returns:
+      the input argument
+    """
     import ipdb
 
     ipdb.set_trace()
-    return x
+    return arg
 
 
 @curry
@@ -46,8 +54,14 @@ def update(funcs, values):
     return valmap(lambda f: f(**values), funcs)
 
 
-class Save:
+def save(func):
     """Save the output from a function.
+
+    Args:
+      func: function to save
+
+    Returns:
+      caching function
 
     >>> @save
     ... def test_func(a):
@@ -60,15 +74,13 @@ class Save:
     6
 
     """
+    saved = dict()
 
-    def __init__(self, f):
-        self.f = f
-        self.out = None
+    def wrapper(*args, **kwargs):
+        """Caching function
+        """
+        if "result" not in saved:
+            saved["result"] = func(*args, **kwargs)
+        return saved["result"]
 
-    def __call__(self, *args, **kwargs):
-        if self.out is None:
-            self.out = self.f(*args, **kwargs)
-        return self.out
-
-
-save = Save
+    return wrapper
