@@ -81,8 +81,7 @@ def theta_eqn(params, sup, theta, **kwargs):  # pylint: disable=unused-argument
         """
         return expression1() / (1 + params["dt"] * expression2())
 
-    return (dict(new=new_value(), old=theta["old"]),
-            abs(new_value() - theta["new"]))
+    return (dict(new=new_value(), old=theta["old"]), abs(new_value() - theta["new"]))
 
 
 GET_MASK = rcompose(
@@ -257,8 +256,7 @@ def step_func(params):
         update(
             dict(
                 sup=lambda **x: do(lambda x: x.updateOld())(x["sup"]),
-                theta=lambda **x: dict(new=x["theta"]["new"],
-                                       old=x["theta"]["new"]),
+                theta=lambda **x: dict(new=x["theta"]["new"], old=x["theta"]["new"]),
                 steps=lambda **x: x["steps"] + 1,
                 sweeps=lambda **x: 0
             )
