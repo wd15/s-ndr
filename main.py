@@ -5,6 +5,7 @@ See the notebooks for more details on usage.
 
 # pylint: disable=no-value-for-parameter
 
+import numpy
 import fipy
 from toolz.curried import memoize, do, curry, valmap, first, pipe
 from toolz_ import update, iterate_, rcompose, save
@@ -30,7 +31,7 @@ def get_params():
         alpha=0.4,
         n=2,
         omega=7.2e-6,
-        faraday=96485.332,
+        F=96485.332,
         v0=0,
         vs=-0.325,
         vm=0.01,
@@ -41,13 +42,69 @@ def get_params():
         sup_ini=0.0,
         nx=100,
         dt=1e-3,
-        vel=10.0e+6,
         output=True,
+        T=270.0,
+        R=8.314,
     )
 
 
+def eta_func(params, eta):
+    """Calculate the forward / backward jump
+
+    Args:
+      params: the parameter dictionary
+      eta: the potential
+
+    Returns:
+      single value for jump
+
+    >>> assert eta_func(get_params(), 0) == 0
+    """
+
+    def alpha_bar(params):
+        """Calculate alphabar
+
+        Args:
+          params: the parameter dictionary
+
+        Returns:
+          the value of alphabar
+        """
+        return params["alpha"] * params["F"] / params["R"] / params["T"]
+
+    return numpy.exp(alpha_bar(params) * eta) - numpy.exp(
+        -(1 - alpha_bar(params)) * eta
+    )
+
+
+def calc_j0(params, eta):
+    """Calculate j0
+
+    Args:
+      params: the parameter dictionary
+      eta: the potential
+
+    Returns:
+      the value of j0
+    """
+    return params["j0"] * eta_func(params, eta)
+
+
+def calc_j1(params, eta):
+    """Calculate j1
+
+    Args:
+      params: the parameter dictionary
+      eta: the potential
+
+    Returns:
+      the value of j1
+    """
+    return params["j1"] * eta_func(params, eta)
+
+
 @curry
-def theta_eqn(params, sup, theta, **kwargs):  # pylint: disable=unused-argument
+def theta_eqn(params, sup, theta, eta, **kwargs):  # pylint: disable=unused-argument
     """Update the suppressor interface value
 
     Args:
@@ -68,12 +125,20 @@ def theta_eqn(params, sup, theta, **kwargs):  # pylint: disable=unused-argument
     def expression1():
         """Evaluation expression for theta equation
         """
-        return theta["old"] + params["dt"] * params["k_plus"] * left(sup)
+
+        return theta["old"] + params["dt"] * (
+            params["k_plus"]
+            * left(sup)
+            + theta["new"]
+            ** 2
+            * params["k_minus"]
+            * (calc_j0(params, eta) - calc_j1(params, eta))
+        )
 
     def expression2():
         """Evaluation expression for theta equation
         """
-        return params["k_plus"] * left(sup) + params["k_minus"] * params["vel"]
+        return params["k_plus"] * left(sup) + params["k_minus"] * calc_j0(params, eta)
 
     @memoize
     def new_value():
@@ -218,6 +283,32 @@ def output_step(values):
     print()
 
 
+@curry
+def calc_eta(params, steps, **kwargs):  # pylint: disable=unused-argument
+    """Calculate the potential
+
+    Args:
+      params: the parameter dictionary
+      steps: the current number of time steps
+
+    Returns:
+      the potential value
+
+    >>> assert calc_eta(dict(dt=0.1, tf=1., vm=0.5, v0=0.), 4) == 0.2
+    >>> assert calc_eta(dict(dt=0.1, tf=1., vm=0.5, v0=1.), 11) == 1.
+    >>> assert calc_eta(dict(dt=0.1, tf=1., vm=0.5, v0=1.), 9) == 1.05
+
+    """
+    current = steps * params["dt"]
+    if current < params["tf"] / 2:
+        return params["v0"] + params["vm"] * current
+
+    elif current < params["tf"]:
+        return params["v0"] + params["vm"] * (params["tf"] - current)
+
+    return params["v0"]
+
+
 def sweep_func(params):
     """Do a sweep and update the variables
 
@@ -233,7 +324,8 @@ def sweep_func(params):
                 sup=sup_eqn(params),
                 theta=theta_eqn(params),
                 steps=lambda **x: (x["steps"], None),
-                sweeps=lambda **x: (x["sweeps"] + 1, None)
+                sweeps=lambda **x: (x["sweeps"] + 1, None),
+                eta=lambda **x: (calc_eta(params, x["steps"]), None)
             )
         ),
         do(lambda x: output_sweep if params["output"] else None),
@@ -258,7 +350,8 @@ def step_func(params):
                 sup=lambda **x: do(lambda x: x.updateOld())(x["sup"]),
                 theta=lambda **x: dict(new=x["theta"]["new"], old=x["theta"]["new"]),
                 steps=lambda **x: x["steps"] + 1,
-                sweeps=lambda **x: 0
+                sweeps=lambda **x: 0,
+                eta=lambda **x: x["eta"]
             )
         ),
         iterate_(sweep_func(params), params["max_sweeps"])
@@ -311,5 +404,6 @@ def run(params):
             sup=get_sup_var(params),
             sweeps=0,
             steps=0,
+            eta=calc_eta(params, 0),
         ),
     )
