@@ -34,6 +34,7 @@ in
     ];
     shellHook = ''
       jupyter nbextension install --py widgetsnbextension --user
+      jupyter nbextension enable widgetsnbextension --user --py
     '';
 
   }
