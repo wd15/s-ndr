@@ -60,20 +60,9 @@ def eta_func(params, eta):
 
     >>> assert eta_func(get_params(), 0) == 0
     """
-
-    def alpha_bar(params):
-        """Calculate alphabar
-
-        Args:
-          params: the parameter dictionary
-
-        Returns:
-          the value of alphabar
-        """
-        return params["alpha"] * params["F"] / params["R"] / params["T"]
-
-    return numpy.exp(alpha_bar(params) * eta) - numpy.exp(
-        -(1 - alpha_bar(params)) * eta
+    return pipe(
+        eta * params["n"] * params["F"] / params["R"] / params["T"],
+        lambda x: numpy.exp(params["alpha"] * x) - numpy.exp(-(1 - params["alpha"]) * x)
     )
 
 
