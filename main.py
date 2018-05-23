@@ -203,6 +203,17 @@ def output_sweep(values):
     Args:
       params: the parameter dictionary
       values: the variable values dictionary
+
+    >>> output_sweep(
+    ...     dict(
+    ...         sweeps=(1,),
+    ...         sup=([1e-3], 1e-2),
+    ...         theta=(dict(new=0.1, old=0.01), 1e-4)
+    ...     )
+    ... ) # doctest: +NORMALIZE_WHITESPACE
+    sweeps                 sup                    theta
+    --------------------   --------------------   --------------------
+    1                      1.000E-02  1.000E-03   1.000E-04  1.000E-01
     """
     keys = ("sweeps", "sup", "theta")
     space = " " * 3
@@ -248,13 +259,10 @@ def output_sweep(values):
         if key == "sweeps":
             return " ".rjust(ljustify // 2)
 
-        elif key == "sup":
-            return sci(float(values[key][0][0]))
-
         elif key == "theta":
             return sci(float(values[key][0]["new"]))
 
-        return ""
+        return sci(float(values[key][0][0]))
 
     print(space.join(map(lambda k: get_res(k) + get_val(k), keys)))
 
@@ -266,6 +274,11 @@ def output_step(values):
     Args:
       params: the parameter dictionary
       values: the value dictionary
+
+    >>> output_step(dict(steps=1))
+    <BLANKLINE>
+    step: 1
+    <BLANKLINE>
     """
     print()
     print("step:", values["steps"])

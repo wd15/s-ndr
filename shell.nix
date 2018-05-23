@@ -3,15 +3,15 @@ let
   download = fetchFromGitHub {
     owner = "wd15";
     repo = "nixes";
-    rev = "5e58e59a945cd3ce3c39d88cc4618d4f426cd030";
-    sha256 = "1s5hmgyxjfs5sgb13sx0rmnkgccmnkn6x64hhxrzjj1m71l5nkyw";
+    rev = "fa3edd44073ea3bd5be9f0ad5b526d75fd1e013b";
+    sha256 = "1m4dia78qp8w5n3rvzzfri3cbkbjamn17qib1gqfm179vyav5an3";
   };
-  nixpkgs = import <nixpkgs> {};
   pkgs = nixpkgs.pkgs;
-  # nixpkgs = import "${download}/fipy-py3/nixpkgs_version.nix";
+  nixpkgs = import "${download}/fipy-py3/nixpkgs_version.nix";
   fipy = import "${download}/fipy-py3/fipy.nix" { inherit nixpkgs; };
   skfmm = import "${download}/fipy-py3/skfmm.nix" { inherit nixpkgs; };
   nbval = import "${download}/fipy-py3/nbval.nix" { inherit nixpkgs; };
+  pytest-cov = import "${download}/fipy-py3/pytest-cov.nix" { inherit nixpkgs; };
 in
   nixpkgs.stdenv.mkDerivation rec {
     name = "s-ndr";
@@ -31,6 +31,7 @@ in
       fipy
       skfmm
       nbval
+      pytest-cov
     ];
     shellHook = ''
       jupyter nbextension install --py widgetsnbextension --user

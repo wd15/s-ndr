@@ -24,7 +24,7 @@ def iterate_(func, times, value):
     return next(iter_)
 
 
-def debug(arg):
+def debug(arg):  # pragma: no cover
     """Debug for function composition
 
     Params:
