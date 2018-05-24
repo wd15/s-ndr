@@ -40,7 +40,7 @@ def debug(arg):  # pragma: no cover
 
 
 @curry
-def update(funcs, values):
+def update_dict(funcs, values):
     """Apply a dict of funcs to a dict of values
 
     >>> values = dict(a=1., b=2., c=4.)
@@ -49,13 +49,18 @@ def update(funcs, values):
     ...     b=lambda a, b, c: a * b * c,
     ...     c=lambda a, b, c: a - b - c
     ... )
-    >>> assert update(funcs, values) == dict(a=7, b=8, c=-5)
+    >>> assert update_dict(funcs, values) == dict(a=7, b=8, c=-5)
     """
     return valmap(lambda f: f(**values), funcs)
 
 
-def save(func):
-    """Save the output from a function.
+@curry
+def cache(func):
+    """Cache decorator for a function
+
+    Enables caching of a function and adds an `update` keyword
+    argument to the funtion so that the function is only reevaluated
+    when `update` is `True`.
 
     Args:
       func: function to save
@@ -63,23 +68,32 @@ def save(func):
     Returns:
       caching function
 
-    >>> @save
-    ... def test_func(a):
+    >>> @cache
+    ... def f(a):
     ...    print('running')
     ...    return 2 * a
-    >>> test_func(3)
+    >>> f(3)
     running
     6
-    >>> test_func(4)
+    >>> f(4)
     6
+
+    >>> f(3, update=True)
+    running
+    6
+    >>> f(4, update=False)
+    6
+    >>> f(5, update=True)
+    running
+    10
 
     """
     saved = dict()
 
-    def wrapper(*args, **kwargs):
+    def wrapper(*args, update=False, **kwargs):
         """Caching function
         """
-        if "result" not in saved:
+        if "result" not in saved or update:
             saved["result"] = func(*args, **kwargs)
         return saved["result"]
 

@@ -7,8 +7,8 @@ See the notebooks for more details on usage.
 
 import numpy
 import fipy
-from toolz.curried import memoize, do, curry, valmap, first, pipe
-from toolz_ import update, iterate_, rcompose, save
+from toolz.curried import do, curry, valmap, first, pipe, memoize
+from toolz_ import update_dict, iterate_, rcompose, cache
 
 
 def get_params():
@@ -19,8 +19,8 @@ def get_params():
     """
     return dict(
         diff_sup=9.2e-11,
-        diff_cu=2.65e-10,
-        cu_inf=240.0,
+        diff_cupric=2.65e-10,
+        cupric_inf=240.0,
         sup_inf=0.01,
         delta=1e-6,
         gamma=2.5e-7,
@@ -40,6 +40,7 @@ def get_params():
         max_steps=400,
         theta_ini=0.0,
         sup_ini=0.0,
+        cupric_ini=0.0,
         nx=100,
         dt=1e-3,
         output=True,
@@ -66,50 +67,57 @@ def eta_func(params, eta):
     )
 
 
-def calc_j0(params, eta):
+def left(var):
+    """Get left value of variable
+    """
+    return float(var[0])
+
+
+def calc_j0(params, eta, cupric):
     """Calculate j0
 
     Args:
       params: the parameter dictionary
       eta: the potential
+      cu: the cupric variable
 
     Returns:
       the value of j0
     """
-    return params["j0"] * eta_func(params, eta)
+    return params["j0"] * eta_func(params, eta) * left(cupric) / params["cupric_inf"]
 
 
-def calc_j1(params, eta):
+def calc_j1(params, eta, cupric):
     """Calculate j1
 
     Args:
       params: the parameter dictionary
       eta: the potential
+      cupric: the cupric variable
 
     Returns:
       the value of j1
     """
-    return params["j1"] * eta_func(params, eta)
+    return params["j1"] * eta_func(params, eta) * left(cupric) / params["cupric_inf"]
+
+
+# pylint: disable=unused-argument
 
 
 @curry
-def theta_eqn(params, sup, theta, eta, **kwargs):  # pylint: disable=unused-argument
+def theta_eqn(params, sup, theta, eta, cupric, **kwargs):
     """Update the suppressor interface value
 
     Args:
       params: the parameter dictionary
       sup: the buld suppressor variable
       theta: the interface suppressor dictionary
+      cupric: the cupric variable
       kwargs: other, unused variables
 
     Returns:
       the updated theta value dictionary and the residual
     """
-
-    def left(var):
-        """Get left value of variable
-        """
-        return float(var[0])
 
     def expression1():
         """Evaluation expression for theta equation
@@ -121,13 +129,15 @@ def theta_eqn(params, sup, theta, eta, **kwargs):  # pylint: disable=unused-argu
             + theta["new"]
             ** 2
             * params["k_minus"]
-            * (calc_j0(params, eta) - calc_j1(params, eta))
+            * calc_j0(params, eta, cupric)
         )
 
     def expression2():
         """Evaluation expression for theta equation
         """
-        return params["k_plus"] * left(sup) + params["k_minus"] * calc_j0(params, eta)
+        return params["k_plus"] * left(sup) + params["k_minus"] * (
+            calc_j0(params, eta, cupric) + theta["new"] * calc_j1(params, eta, cupric)
+        )
 
     @memoize
     def new_value():
@@ -144,8 +154,87 @@ GET_MASK = rcompose(
 )
 
 
-@save
-def get_eqn(params, mesh):
+def get_eqn(mesh, diff):
+    """Generate a generic 1D diffusion equation with flux from the left
+
+     Args:
+      mesh: the mesh
+      diff: the diffusion coefficient
+
+    Returns:
+      a tuple of the flux and the equation
+    """
+    flux = fipy.CellVariable(mesh, value=0.)
+    eqn = fipy.TransientTerm() == fipy.DiffusionTerm(diff) + fipy.ImplicitSourceTerm(
+        flux * GET_MASK(mesh) / mesh.dx
+    )
+    return (flux, eqn)
+
+
+@cache
+def get_cupric_eqn(params, mesh):
+    """Generate the cupric equation.
+
+    This equation is cached and is only run once.
+
+    Args:
+      params: the parameter dictionary
+      mesh: the mesh
+
+    Returns:
+      a function that updates the equation
+    """
+    flux, eqn = get_eqn(mesh, params["diff_cupric"])
+
+    def func(eta, theta):
+        """Function that actually updates the equaton at each sweep.
+
+        Args:
+           eta: the potential
+           theta: the new value of theta
+
+        Returns:
+           the updated equation
+        """
+        flux.setValue(
+            -eta_func(params, eta)
+            / params["omega"]
+            / params["cupric_inf"]
+            * (params["j0"] * (1 - theta["new"]) + params["j1"] * theta["new"])
+        )
+        return eqn
+
+    return func
+
+
+# pylint: disable=unused-argument, too-many-arguments
+
+
+@curry
+def cupric_eqn(params, cupric, eta, theta, sweeps, steps, **kwargs):
+    """Update the bulk suppressor variable
+
+    Args:
+      params: the parameter dictionary
+      eta: the potential value
+      theta: the interface suppressor dictionary
+      kwargs: other unused variables
+
+    Returns:
+      the updated cupric value and the residual
+    """
+    update = False
+    if sweeps == 0 and steps == 0:
+        update = True
+    # pylint: disable=unexpected-keyword-arg
+    res = get_cupric_eqn(params, cupric.mesh, update=update)(eta, theta).sweep(
+        cupric, dt=params["dt"]
+    )
+    return (cupric, res)
+
+
+@cache
+def get_sup_eqn(params, mesh):
     """Generate the buld suppressor equation.
 
     This equation is cached and is only run once.
@@ -157,12 +246,7 @@ def get_eqn(params, mesh):
     Returns:
       a function that updates the equation
     """
-    flux = fipy.CellVariable(mesh, value=0.)
-    eqn = fipy.TransientTerm() == fipy.DiffusionTerm(
-        params["diff_sup"]
-    ) + fipy.ImplicitSourceTerm(
-        flux * GET_MASK(mesh) / mesh.dx
-    )
+    flux, eqn = get_eqn(mesh, params["diff_sup"])
 
     def func(theta):
         """Function that actually updates the equaton at each sweep.
@@ -179,8 +263,11 @@ def get_eqn(params, mesh):
     return func
 
 
+# pylint: disable=unused-argument
+
+
 @curry
-def sup_eqn(params, sup, theta, **kwargs):  # pylint: disable=unused-argument
+def sup_eqn(params, sup, theta, sweeps, steps, **kwargs):
     """Update the bulk suppressor variable
 
     Args:
@@ -192,7 +279,13 @@ def sup_eqn(params, sup, theta, **kwargs):  # pylint: disable=unused-argument
     Returns:
       the update buld suppressor and the residual
     """
-    res = get_eqn(params, sup.mesh)(theta).sweep(sup, dt=params["dt"])
+    update = False
+    if sweeps == 0 and steps == 0:
+        update = True
+    # pylint: disable=unexpected-keyword-arg
+    res = get_sup_eqn(params, sup.mesh, update=update)(theta).sweep(
+        sup, dt=params["dt"]
+    )
     return (sup, res)
 
 
@@ -215,7 +308,7 @@ def output_sweep(values):
     --------------------   --------------------   --------------------
     1                      1.000E-02  1.000E-03   1.000E-04  1.000E-01
     """
-    keys = ("sweeps", "sup", "theta")
+    keys = list(filter(lambda x: x != "steps", values.keys()))
     space = " " * 3
     ljustify = 20
     if values["sweeps"][0] == 1:
@@ -321,16 +414,17 @@ def sweep_func(params):
       a function that modifies value dictionary
     """
     return rcompose(
-        update(
+        update_dict(
             dict(
                 sup=sup_eqn(params),
+                cupric=cupric_eqn(params),
                 theta=theta_eqn(params),
                 steps=lambda **x: (x["steps"], None),
                 sweeps=lambda **x: (x["sweeps"] + 1, None),
                 eta=lambda **x: (calc_eta(params, x["steps"]), None)
             )
         ),
-        do(lambda x: output_sweep if params["output"] else None),
+        do(lambda x: output_sweep(x) if params["output"] else None),
         valmap(first)
     )
 
@@ -347,9 +441,10 @@ def step_func(params):
     """
     return rcompose(
         do(lambda x: output_step if params["output"] else None),
-        update(
+        update_dict(
             dict(
                 sup=lambda **x: do(lambda x: x.updateOld())(x["sup"]),
+                cupric=lambda **x: do(lambda x: x.updateOld())(x["cupric"]),
                 theta=lambda **x: dict(new=x["theta"]["new"], old=x["theta"]["new"]),
                 steps=lambda **x: x["steps"] + 1,
                 sweeps=lambda **x: 0,
@@ -360,32 +455,36 @@ def step_func(params):
     )
 
 
-def get_mesh(params):
+@memoize
+def get_mesh(ncells, delta):
     """Make the mesh
 
     Args:
-      params: the parameter dictioniary
+      ncells: number of cells
+      delta: the domain size
 
     Returns:
       the mesh
     """
-    return fipy.Grid1D(nx=params["nx"], dx=params["delta"] / params["nx"])
+    return fipy.Grid1D(nx=ncells, dx=delta / ncells)
 
 
-def get_sup_var(params):
-    """Make the bulk suppressor variable with constraint
+def get_var(params, ini, inf):
+    """Make a variable with constraint
 
     Args:
       params: the parameter dictionary
+      ini: initial value
+      inf: far field value
 
     Returns:
-      the bulk suppressor variable
+      the variable
     """
     return pipe(
         params,
-        get_mesh,
-        lambda x: fipy.CellVariable(x, value=params["sup_ini"], hasOld=True),
-        do(lambda x: x.constrain(params["sup_inf"], where=x.mesh.facesRight)),
+        lambda x: get_mesh(x["nx"], x["delta"]),
+        lambda x: fipy.CellVariable(x, value=ini, hasOld=True),
+        do(lambda x: x.constrain(inf, where=x.mesh.facesRight)),
     )
 
 
@@ -403,9 +502,10 @@ def run(params):
         params["max_steps"],
         dict(
             theta=dict(new=params["theta_ini"], old=params["theta_ini"]),
-            sup=get_sup_var(params),
+            sup=get_var(params, params["sup_ini"], params["sup_inf"]),
+            cupric=get_var(params, params["cupric_ini"], params["cupric_inf"]),
             sweeps=0,
-            steps=0,
+            steps=-1,
             eta=calc_eta(params, 0),
         ),
     )
