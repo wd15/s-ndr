@@ -12,6 +12,10 @@ let
   skfmm = import "${download}/fipy-py3/skfmm.nix" { inherit nixpkgs; };
   nbval = import "${download}/fipy-py3/nbval.nix" { inherit nixpkgs; };
   pytest-cov = import "${download}/fipy-py3/pytest-cov.nix" { inherit nixpkgs; };
+  texlive = nixpkgs.pkgs.texlive;
+  # latex = (nixpkgs.pkgs.texlive.combine {
+  #   inherit (nixpkgs.pkgs.texlive) scheme-medium collection-fontsreccommended collection-latexextra;
+  # })
 in
   nixpkgs.stdenv.mkDerivation rec {
     name = "s-ndr";
@@ -29,6 +33,8 @@ in
       nixpkgs.python36Packages.flake8
       nixpkgs.python36Packages.ipywidgets
       nixpkgs.python36Packages.tkinter
+      # nixpkgs.pkgs.texlive.combined.scheme-medium
+#      (texlive.combine { inherit (texlive) scheme-medium collection-latexextra; })
       fipy
       skfmm
       nbval
