@@ -25,7 +25,7 @@ def get_params():
         delta=1e-6,
         gamma=2.5e-7,
         k_plus=2300.0,
-        k_minus=3.79e-6,
+        k_minus=3.79e+7,
         j0=20.0,
         j1=1e-3,
         alpha=0.4,
@@ -301,13 +301,15 @@ def output_sweep(values):
     ...     dict(
     ...         sweeps=(1,),
     ...         sup=([1e-3], 1e-2),
-    ...         theta=(dict(new=0.1, old=0.01), 1e-4)
+    ...         theta=(dict(new=0.1, old=0.01), 1e-4),
+    ...         eta=(1.0, 0.0)
     ...     )
     ... ) # doctest: +NORMALIZE_WHITESPACE
-    sweeps                 sup                    theta
-    --------------------   --------------------   --------------------
-    1                      1.000E-02  1.000E-03   1.000E-04  1.000E-01
-    """
+    sweeps                 sup                    theta                  eta
+    --------------------   --------------------   --------------------   --------------------
+    1                      1.000E-02  1.000E-03   1.000E-04  1.000E-01   0.000E+00  1.000E+00
+
+    """  # noqa: E501
     keys = list(filter(lambda x: x != "steps", values.keys()))
     space = " " * 3
     ljustify = 20
@@ -354,6 +356,9 @@ def output_sweep(values):
 
         elif key == "theta":
             return sci(float(values[key][0]["new"]))
+
+        elif key == "eta":
+            return sci(float(values[key][0]))
 
         return sci(float(values[key][0][0]))
 
@@ -419,9 +424,9 @@ def sweep_func(params):
                 sup=sup_eqn(params),
                 cupric=cupric_eqn(params),
                 theta=theta_eqn(params),
-                steps=lambda **x: (x["steps"], None),
-                sweeps=lambda **x: (x["sweeps"] + 1, None),
-                eta=lambda **x: (calc_eta(params, x["steps"]), None)
+                steps=lambda **x: (x["steps"], 0.0),
+                sweeps=lambda **x: (x["sweeps"] + 1, 0.0),
+                eta=lambda **x: (calc_eta(params, x["steps"]), 0.0)
             )
         ),
         do(lambda x: output_sweep(x) if params["output"] else None),
@@ -440,7 +445,7 @@ def step_func(params):
       a function to do a time step
     """
     return rcompose(
-        do(lambda x: output_step if params["output"] else None),
+        do(lambda x: output_step(x) if params["output"] else None),
         update_dict(
             dict(
                 sup=lambda **x: do(lambda x: x.updateOld())(x["sup"]),

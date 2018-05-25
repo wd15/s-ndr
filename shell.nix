@@ -28,6 +28,7 @@ in
       nixpkgs.python36Packages.matplotlib
       nixpkgs.python36Packages.flake8
       nixpkgs.python36Packages.ipywidgets
+      nixpkgs.python36Packages.tkinter
       fipy
       skfmm
       nbval
