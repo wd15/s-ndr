@@ -1,1 +1,1 @@
-import ./env.nix { with_latex=false; }
+import ./env.nix { with_latex=true; }

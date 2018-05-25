@@ -1,8 +1,8 @@
 ---
 language: nix
 script:
-  - nix-shell --command "py.test"
+  - nix-shell test.nix --command "py.test"
   - nix-shell -p "python36Packages.black" --command "black --check main.py"
   - nix-shell -p "python36Packages.black" --command "black --check toolz_.py"
-  - nix-shell --command "pylint *.py"
-  - nix-shell --command "flake8 *.py"
+  - nix-shell test.nix --command "pylint *.py"
+  - nix-shell test.nix --command "flake8 *.py"
