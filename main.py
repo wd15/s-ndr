@@ -7,7 +7,7 @@ See the notebooks for more details on usage.
 
 import numpy
 import fipy
-from toolz.curried import do, curry, valmap, first, pipe, memoize
+from toolz.curried import do, curry, valmap, first, pipe, memoize, identity, get, itemmap
 from toolz_ import update_dict, iterate_, rcompose, cache
 
 
@@ -426,12 +426,42 @@ def sweep_func(params):
                 theta=theta_eqn(params),
                 steps=lambda **x: (x["steps"], 0.0),
                 sweeps=lambda **x: (x["sweeps"] + 1, 0.0),
-                eta=lambda **x: (calc_eta(params, x["steps"]), 0.0)
+                eta=lambda **x: (calc_eta(params, x["steps"]), 0.0),
+                data=lambda **x: (x['data'], 0.0)
             )
         ),
         do(lambda x: output_sweep(x) if params["output"] else None),
         valmap(first)
     )
+
+
+def update_data(data, **kwargs):
+    """Update the temporal data dictionary
+
+    Args:
+      data: the temporal data dictionary
+
+    Returns:
+      the updated temporal data dictionary
+
+    >>> mesh = fipy.Grid1D(nx=10)
+    >>> out = update_data(
+    ...     cupric=fipy.CellVariable(mesh=mesh, value=1.),
+    ...     sup=fipy.CellVariable(mesh=mesh, value=2.),
+    ...     theta=dict(new=3.),
+    ...     eta=4.,
+    ...     data=dict(cupric=[], sup=[], theta=[], eta=[])
+    ... )
+    >>> assert out == dict(cupric=[1.0], sup=[2.0], theta=[3.0], eta=[4.0])
+    """
+    def val(key, value):
+        return value + [dict(
+            sup=left,
+            cupric=left,
+            theta=get("new"),
+            eta=identity
+        )[key](kwargs[key])]
+    return itemmap(lambda kv: (kv[0], val(kv[0], kv[1])), data)
 
 
 @curry
@@ -453,7 +483,8 @@ def step_func(params):
                 theta=lambda **x: dict(new=x["theta"]["new"], old=x["theta"]["new"]),
                 steps=lambda **x: x["steps"] + 1,
                 sweeps=lambda **x: 0,
-                eta=lambda **x: x["eta"]
+                eta=lambda **x: x["eta"],
+                data=update_data
             )
         ),
         iterate_(sweep_func(params), params["max_sweeps"])
@@ -512,5 +543,6 @@ def run(params):
             sweeps=0,
             steps=-1,
             eta=calc_eta(params, 0),
+            data = dict(cupric=[], sup=[], theta=[], eta=[])
         ),
     )
