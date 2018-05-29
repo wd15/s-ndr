@@ -13,27 +13,35 @@ RUN apt-get install -y bzip2 && apt-get clean
 RUN apt-get install -y curl && apt-get clean
 RUN apt-get -y update
 
-RUN useradd -m -s /bin/bash main
-RUN echo "main:main" | chpasswd
-RUN adduser main sudo
+ENV NB_USER jovyan
+ENV NB_UID 1000
+ENV HOME /home/${NB_USER}
+
+RUN adduser --disabled-password \
+    --gecos "Default user" \
+    --uid ${NB_UID} \
+    ${NB_USER}
+
+# RUN adduser --disabled-password --gecos "Default user" --uid 1000 main
+RUN echo "${NB_USER}:${NB_USER}" | chpasswd
+RUN adduser ${NB_USER} sudo
 
 EXPOSE 8888
 
-USER main
+USER ${NB_USER}
 
-ENV HOME /home/main
 ENV SHELL /bin/bash
-ENV USER main
+ENV USER ${NB_USER}
 WORKDIR $HOME
 
 USER root
 
-RUN chown -R main:main /home/main
-RUN echo "main ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+RUN chown -R ${NB_USER}:${NB_USER} $HOME
+RUN echo "${NB_USER} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 RUN mkdir /etc/nix
 RUN echo "build-users-group =" > /etc/nix/nix.conf
 
-USER main
+USER ${NB_USER}
 
 ## Install Nix
 
@@ -48,12 +56,25 @@ RUN echo "export MANPATH=/nix/var/nix/profiles/default/share/man:\$HOME/.nix-pro
 
 ## Copy directory
 
-COPY ./ ./s-ndr/
-WORKDIR $HOME/s-ndr
+RUN /bin/bash -c " \
+    source ~/nix.sh; \
+    nix-env -i git; \
+    git clone https://github.com/wd15/s-ndr.git; \
+    cd s-ndr; \
+    nix-shell"
+
+COPY . $HOME
+USER root
+RUN chown -R 1000 ${HOME}
+USER ${NB_USER}
 
 RUN /bin/bash -c " \
     source ~/nix.sh; \
-    nix-shell;"
+    nix-shell"
 
 RUN echo "source ~/nix.sh" >> ~/.bashrc
 EXPOSE 8888
+
+CMD /bin/bash -c " \
+    source ~/nix.sh; \
+    nix-shell --command 'jupyter notebook --port 8888 --ip 0.0.0.0';"
