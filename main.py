@@ -7,7 +7,8 @@ See the notebooks for more details on usage.
 
 import numpy
 import fipy
-from toolz.curried import do, curry, valmap, first, pipe, memoize, identity, get, itemmap
+from toolz.curried import do, curry, valmap, first, pipe
+from toolz.curried import memoize, identity, get, itemmap
 from toolz_ import update_dict, iterate_, rcompose, cache
 
 
@@ -427,7 +428,7 @@ def sweep_func(params):
                 steps=lambda **x: (x["steps"], 0.0),
                 sweeps=lambda **x: (x["sweeps"] + 1, 0.0),
                 eta=lambda **x: (calc_eta(params, x["steps"]), 0.0),
-                data=lambda **x: (x['data'], 0.0)
+                data=lambda **x: (x["data"], 0.0)
             )
         ),
         do(lambda x: output_sweep(x) if params["output"] else None),
@@ -454,13 +455,16 @@ def update_data(data, **kwargs):
     ... )
     >>> assert out == dict(cupric=[1.0], sup=[2.0], theta=[3.0], eta=[4.0])
     """
+
     def val(key, value):
-        return value + [dict(
-            sup=left,
-            cupric=left,
-            theta=get("new"),
-            eta=identity
-        )[key](kwargs[key])]
+        """Append the current temporal value to the list of previous values.
+        """
+        return value + [
+            dict(sup=left, cupric=left, theta=get("new"), eta=identity)[key](
+                kwargs[key]
+            )
+        ]
+
     return itemmap(lambda kv: (kv[0], val(kv[0], kv[1])), data)
 
 
@@ -543,6 +547,6 @@ def run(params):
             sweeps=0,
             steps=-1,
             eta=calc_eta(params, 0),
-            data = dict(cupric=[], sup=[], theta=[], eta=[])
+            data=dict(cupric=[], sup=[], theta=[], eta=[]),
         ),
     )
