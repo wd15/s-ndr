@@ -23,8 +23,8 @@ RUN adduser --disabled-password \
     ${NB_USER}
 
 # RUN adduser --disabled-password --gecos "Default user" --uid 1000 main
-RUN echo "${NB_USER}:${NB_USER}" | chpasswd
-RUN adduser ${NB_USER} sudo
+# RUN echo "${NB_USER}:${NB_USER}" | chpasswd
+# RUN adduser ${NB_USER} sudo
 
 EXPOSE 8888
 
@@ -36,12 +36,15 @@ WORKDIR $HOME
 
 USER root
 
-RUN chown -R ${NB_USER}:${NB_USER} $HOME
-RUN echo "${NB_USER} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+# RUN chown -R ${NB_USER}:${NB_USER} $HOME
+# RUN echo "${NB_USER} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 RUN mkdir /etc/nix
 RUN echo "build-users-group =" > /etc/nix/nix.conf
+RUN mkdir /nix
+RUN chown -R ${NB_USER}:${NB_USER} /nix
 
 USER ${NB_USER}
+
 
 ## Install Nix
 
