@@ -78,6 +78,10 @@ RUN /bin/bash -c " \
 RUN echo "source ~/nix.sh" >> ~/.bashrc
 EXPOSE 8888
 
-CMD /bin/bash -c " \
-    source ~/nix.sh; \
-    nix-shell --command 'jupyter notebook --port 8888 --ip 0.0.0.0';"
+
+RUN echo 'source ~/nix.sh; \
+nix-shell --command "jupyter notebook --port 8888 --ip 0.0.0.0"; \
+' > ${HOME}/start-notebook.sh
+
+CMD ["/bin/bash", "start-notebook.sh"]
+
